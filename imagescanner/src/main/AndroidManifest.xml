@@ -1,0 +1,40 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="booktoaudiio.gold.com.imagescanner">
+
+
+    <application>
+        <activity
+            android:name=".OpenNoteScannerActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:label="@string/title_activity_open_note_scanner"
+            android:screenOrientation="portrait"
+            android:theme="@style/FullscreenTheme.NoActionBar">
+        </activity>
+        <activity
+            android:name=".GalleryGridActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:label="@string/title_activity_gallery"
+            android:screenOrientation="portrait"
+            android:theme="@style/FullscreenTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".FullScreenViewActivity"
+            android:theme="@style/FullscreenTheme" />
+        <activity
+            android:name=".SettingsActivity"
+            android:label="@string/settings"
+            android:theme="@style/AppTheme" />
+        <provider
+            android:name="android.support.v4.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths"/>
+        </provider>
+    </application>
+</manifest>

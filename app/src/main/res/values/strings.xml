@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">BookToAudio</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_notifications">Notifications</string>
+
+    <string name="scanning">Scanning</string>
+    <string name="done">Save</string>
+    <string name="scan">Next</string>
+    <string name="cantCrop">Cant crop the image, change the points</string>
+    <string name="ok">Ok</string>
+    <string name="loading">Loading</string>
+    <string name="applying_filter">Applying filter</string>
+    <string name="low_memory">Low Memory</string>
+    <string name="low_memory_message">Your phone is low on memory, you may feel some lags while editing images.</string>
+
+</resources>
