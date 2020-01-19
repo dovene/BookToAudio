@@ -163,6 +163,7 @@ public class OpenNoteScannerActivity extends OpenCVInitializerActivity
     private boolean mBugRotate=false;
     private SharedPreferences mSharedPref;
     private SimpleDateFormat mDateFormat = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss");
+    private final static int DELAY_BEFORE_EXIT = 500; //1/2 seconds
 
     public HUDCanvasView getHUD() {
         return mHud;
@@ -209,7 +210,7 @@ public class OpenNoteScannerActivity extends OpenCVInitializerActivity
 
             @Override
             public void onClick(View v) {
-                /*if (scanClicked) {
+                if (scanClicked) {
                     requestPicture();
                     ViewCompat.setBackgroundTintList(scanDocButton,null);
                     waitSpinnerVisible();
@@ -217,11 +218,11 @@ public class OpenNoteScannerActivity extends OpenCVInitializerActivity
                     scanClicked = true;
                     Toast.makeText(getApplicationContext(), R.string.scanningToast, Toast.LENGTH_LONG).show();
                     ViewCompat.setBackgroundTintList(v,ColorStateList.valueOf(0x7F60FF60));
-                }*/
-
+                }
+            /*
                 requestPicture();
                 ViewCompat.setBackgroundTintList(scanDocButton,null);
-                waitSpinnerVisible();
+                waitSpinnerVisible();*/
 
             }
         });
@@ -1052,17 +1053,24 @@ public class OpenNoteScannerActivity extends OpenCVInitializerActivity
         }
 
 
-        Intent returnIntent = new Intent();
-        returnIntent.putExtra(FILE_PATH,fileName);
-        setResult(RESULT_OK,returnIntent);
-        finish();
+
+
 
 
         // Record goal "PictureTaken"
        /* ((OpenNoteScannerApplication) getApplication()).getTracker().trackGoal(1);*/
 
         refreshCamera();
+        endScan(fileName);
 
+    }
+
+    private void endScan(final String path){
+        Intent returnIntent = new Intent();
+        returnIntent.putExtra(FILE_PATH,path);
+        setResult(RESULT_OK,returnIntent);
+        finish();
+        OpenNoteScannerActivity.this.overridePendingTransition(android.R.anim.fade_out,android.R.anim.fade_in);
     }
 
     class AnimationRunnable implements Runnable {

@@ -10,17 +10,22 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.support.annotation.NonNull;
 import android.support.design.widget.BottomNavigationView;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.gold.booktoaudio.helper.FileUtils;
@@ -40,10 +45,20 @@ import java.util.HashMap;
 
 import booktoaudiio.gold.com.imagescanner.OpenNoteScannerActivity;
 import static booktoaudiio.gold.com.imagescanner.OpenNoteScannerActivity.FILE_PATH;
+import static com.gold.booktoaudio.presenter.BookFragmentPresenter.DELAY_BEFORE_EXIT;
+
+import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
 import timber.log.Timber;
 
 
-public class HomeActivity extends AppCompatActivity implements BookFragmentPresenter.BookFragmentViewListener{
+public class HomeActivity extends AppCompatActivity implements BookFragmentPresenter.BookFragmentViewListener,
+        BookFragmentPresenter.PresenterInterface{
 
     private EditText mTextMessage;
     private BookFragmentPresenter bookFragmentPresenter;
@@ -60,8 +75,9 @@ public class HomeActivity extends AppCompatActivity implements BookFragmentPrese
     private MediaPlayer mMediaPlayer;
     private boolean mProcessed = false;
     private final String FILENAME = "/wpta_tts.wav";
-    private ProgressDialog mProgressDlg;
-    private boolean playerReady = false;
+
+
+    private ProgressBar progressBar;
 
 
     private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener
@@ -84,33 +100,84 @@ public class HomeActivity extends AppCompatActivity implements BookFragmentPrese
         }
     };
 
+    @Override
+    public void onImageOCRized(String text) {
+        //record(text);
+        mTextMessage.setText(text);
+        onTaskEnded();
+    }
 
 
+
+    private ProgressBar getProgressBar(){
+        if (progressBar==null){
+            progressBar = new ProgressBar(this,null,android.R.attr.progressBarStyle);
+            RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(100,100);
+            params.addRule(RelativeLayout.CENTER_IN_PARENT);
+            ((LinearLayout)findViewById(R.id.content)).addView(progressBar,params);
+            progressBar.setIndeterminate(true);
+            getProgressBar().setVisibility(View.GONE);
+        }
+        return progressBar;
+    }
+
+    @Override
+    public void onTaskStarted() {
+
+            getProgressBar().setVisibility(View.VISIBLE);
+
+
+    }
+
+    @Override
+    public void onTaskEnded() {
+        getProgressBar().setVisibility(View.GONE);
+    }
+
+    @Override
+    public void onPdfTextExtracted(String text) {
+        mTextMessage.setText(text);
+        onTaskEnded();
+    }
+
+    private TextRecognizer getTextRecognizer(){
+        if(textRecognizer==null){
+            textRecognizer = new TextRecognizer.Builder(this).build();
+        }
+       return textRecognizer;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
-        textRecognizer = new TextRecognizer.Builder(this).build();
-        bookFragmentPresenter = new BookFragmentPresenter(this);
 
-        mTessOCR = new TessOCR(this, language);
+        bookFragmentPresenter = new BookFragmentPresenter(this, this);
+
+
+        //mTessOCR = new TessOCR(this, language);
         findViewById(R.id.btnScan).setOnClickListener((View v)-> {
                     Intent scanIntent =  new Intent(this,OpenNoteScannerActivity.class);
                     startActivityForResult(scanIntent,SCAN_CODE);
+                    onTaskStarted();
                 }
         );
+
 
         mTextMessage =  findViewById(R.id.message);
         BottomNavigationView navigation =  findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
 
-        findViewById(R.id.btn).setOnClickListener((View v)-> record());
+        findViewById(R.id.btn).setOnClickListener((View v)->
+                onVoiceButtonTriggered()
+                //record()
+                );
         findViewById(R.id.btnFile).setOnClickListener((View v)->{
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
             intent.setType("*/*");
             //intent.setType("application/pdf");
             startActivityForResult(intent, REQ_FILE_PICKER);
+            onTaskStarted();
         });
         initMediaPlayer();
         // initComponent();
@@ -144,144 +211,56 @@ public class HomeActivity extends AppCompatActivity implements BookFragmentPrese
     }
 
 
-    private void doOCR (final Bitmap bitmap) {
-        if (mProgressDialog == null) {
-            mProgressDialog = ProgressDialog.show(this, "Processing",
-                    "Doing OCR...", true);
-        } else {
-            mProgressDialog.show();
-        }
-        new Thread(new Runnable() {
-            public void run() {
-                final String srcText = mTessOCR.getOCRResult(bitmap);
-                HomeActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        // TODO Auto-generated method stub
-                        if (srcText != null && !srcText.equals("")) {
-                            //srcText contiene el texto reconocido
-
-                            mTextMessage.setText(srcText);
-                        }
-                        mTessOCR.onDestroy();
-                        mProgressDialog.dismiss();
-                    }
-                });
-            }
-        }).start();
-    }
-
-
     @Override
     public void onVoiceButtonTriggered() {
         bookFragmentPresenter.fromTextToAudio(mTextMessage.getText().toString());
     }
 
-
-    private void testOpenCV(){
-        Mat mat = new Mat(100,100, CvType.CV_8UC4);
-        Timber.d(getClass().getName()+ " width : "+mat.width());
-    }
-
-
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-       // super.onActivityResult(requestCode, resultCode, data);
+    private  void processResult(int requestCode, int resultCode, Intent data){
+        onTaskStarted();
         switch (requestCode) {
             case REQ_FILE_PICKER:
                 if (resultCode == RESULT_OK) {
-                   File file  =  new File(data.getData().toString());
-                    String pathHolder = FileUtils.getPath(data.getData(),getContentResolver(),this);
-
-                    if(FileUtils.isPdfFile(pathHolder)){
-                        proceedPdf(pathHolder);
-
-                    }else{
-                        //onVoiceButtonTriggered();
-                        procesImageFile(data.getData());
-                    }
-                    Toast.makeText(HomeActivity.this, pathHolder, Toast.LENGTH_LONG).show();
+                    processSelecteFile(data.getData());
+                    //Toast.makeText(HomeActivity.this, pathHolder, Toast.LENGTH_LONG).show();
                 }
                 break;
 
             case SCAN_CODE:
                 if (resultCode == RESULT_OK) {
-
-                    // processImageFile
-                    String filePath = data.getStringExtra(FILE_PATH);
-                    procesImageFile(filePath);
-                }
-
-                break;
-
-
-
-        }
-    }
-
-
-
-    private void proceedPdf(String pathHolder){
-        try {
-            String parsedText="";
-            PdfReader reader = new PdfReader(pathHolder);
-            int n = reader.getNumberOfPages();
-            for (int i = 0; i <n ; i++) {
-                parsedText   = parsedText+ PdfTextExtractor.getTextFromPage(reader, i+1).trim()+"\n"; //Extracting the content from the different pages
-            }
-
-            onVoiceButtonTriggered();
-            reader.close();
-        } catch (Exception e) {
-            // System.out.println(e);
-            Log.e(getClass().getName(),e.getMessage());
-        }
-    }
-
-    private void procesImageFile(Uri uri){
-        doOCRUsingGoogleApi(FileUtils.getBitmapFromUri(uri,getContentResolver()));
-    }
-
-    private void procesImageFile(String path){
-
-        Bitmap bitmap = FileUtils.getBitmapFromFilePath(path);
-        doOCRUsingGoogleApi(bitmap);
-    }
-
-
-    private void doOCRUsingGoogleApi(Bitmap bitmap){
-
-        if (!textRecognizer.isOperational()) {
-            Timber.d( "Detector dependencies not loaded yet");
-        } else {
-            Frame frame = new Frame.Builder().setBitmap(bitmap).build();
-
-            final SparseArray<TextBlock> items = textRecognizer.detect(frame);
-            mTextMessage.post(new Runnable() {
-                @Override
-                public void run() {
-                    StringBuilder stringBuilder = new StringBuilder();
-                    for(int i=0;i<items.size();i++){
-                        TextBlock item = items.valueAt(i);
-                        stringBuilder.append(item.getValue());
-                        stringBuilder.append("\n");
+                    if (!TextUtils.isEmpty(data.getStringExtra(FILE_PATH))){
+                        bookFragmentPresenter.getTextFromFileObserver(data.getStringExtra(FILE_PATH),getTextRecognizer());
                     }
-                    mTextMessage.setText(stringBuilder.toString());
-                   // onVoiceButtonTriggered();
-                    record();
                 }
-            });
-
+                break;
         }
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+       // super.onActivityResult(requestCode, resultCode, data);
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                processResult(requestCode,resultCode,data);
+            }
+        },DELAY_BEFORE_EXIT);
+    }
+
+    private void  processSelecteFile(Uri uri){
+        File file  =  new File(uri.toString());
+        String pathHolder = FileUtils.getPath(uri,getContentResolver(),this);
+        if(FileUtils.isPdfFile(pathHolder)){
+            if (!TextUtils.isEmpty(pathHolder)){
+                bookFragmentPresenter.extractTextFromPdfObserver(pathHolder);
+            }
+        }else{
+            if (!TextUtils.isEmpty(uri.toString())){
+                bookFragmentPresenter.getTextFromFileObserver(FileUtils.getPath(uri,getContentResolver(),this),getTextRecognizer());
+            }
+        }
+    }
 
 
     @SuppressWarnings("deprecation")
@@ -328,96 +307,6 @@ public class HomeActivity extends AppCompatActivity implements BookFragmentPrese
         }
     }
 
-    private void initComponent(){
-        // Instantiating TextToSpeech class
-        mTts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
-            @Override
-            public void onInit(int i) {
-               // mStatus = i;
-               // setTts(mTts);
-            }
-        });
-
-        // Getting reference to the button btn_speek
-        Button btnSpeek = (Button) findViewById(R.id.btn);
-
-        // Creating a progress dialog window
-        mProgressDialog = new ProgressDialog(this);
-
-        // Creating an instance of MediaPlayer
-        mMediaPlayer = new MediaPlayer();
-
-        // Close the dialog window on pressing back button
-        mProgressDialog.setCancelable(true);
-
-        // Setting a horizontal style progress bar
-        mProgressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-
-        /** Setting a message for this progress dialog
-         * Use the method setTitle(), for setting a title
-         * for the dialog window
-         *  */
-        mProgressDialog.setMessage("Please wait ...");
-
-        // Defining click event listener for the button btn_speak
-        View.OnClickListener btnClickListener = new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-
-                if(mStatus==TextToSpeech.SUCCESS){
-
-                    // Getting reference to the Button
-                    Button btnSpeak = (Button) findViewById(R.id.btn);
-
-                    btnSpeak.setText("Pause");
-
-                    if(mMediaPlayer != null && mMediaPlayer.isPlaying()){
-                        playMediaPlayer(1);
-                        btnSpeak.setText("Speak");
-                        return;
-                    }
-
-                    mProgressDialog.show();
-
-
-                    HashMap<String, String> myHashRender = new HashMap();
-                    String utteranceID = "wpta";
-                    myHashRender.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceID);
-
-                    String fileName = Environment.getExternalStorageDirectory().getAbsolutePath() + FILENAME;
-
-                    if(!mProcessed){
-                        int status = mTts.synthesizeToFile(mTextMessage.getText().toString(), myHashRender, fileName);
-                    }else{
-                        playMediaPlayer(0);
-                    }
-                }else{
-                    String msg = "TextToSpeech Engine is not initialized";
-                    Toast.makeText(getBaseContext(),msg, Toast.LENGTH_SHORT).show();
-                }
-            }
-        };
-
-        // Set Click event listener for the button btn_speak
-        btnSpeek.setOnClickListener(btnClickListener);
-
-        MediaPlayer.OnCompletionListener mediaPlayerCompletionListener = new MediaPlayer.OnCompletionListener() {
-
-            @Override
-            public void onCompletion(MediaPlayer mp) {
-                // Getting reference to the button btn_speek
-                Button btnSpeek = (Button) findViewById(R.id.btn);
-
-                // Changing button Text to Speek
-                btnSpeek.setText("Speak");
-            }
-        };
-
-        mMediaPlayer.setOnCompletionListener(mediaPlayerCompletionListener);
-
-    }
-
     @Override
     public void onPause()
     {
@@ -439,6 +328,7 @@ public class HomeActivity extends AppCompatActivity implements BookFragmentPrese
         if( mTts != null) {
             mTts.shutdown();
         }
+        bookFragmentPresenter.onUIDestroy();
     }
 
 

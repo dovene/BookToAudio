@@ -33,7 +33,7 @@ import timber.log.Timber;
 
 public class FileUtils {
 
-    private final static String tag = "GetFilePathUtils";
+    private final static String tag = "FileUtils";
 
     public static String getPath(final Uri uri, ContentResolver contentResolver, Context context) {
 
@@ -59,9 +59,9 @@ public class FileUtils {
 
     @TargetApi(19)
     public static String getForApi19(Uri uri, Context context, ContentResolver contentResolver) {
-        Log.e(tag, "+++ API 19 URI :: " + uri);
+
         if (DocumentsContract.isDocumentUri(context, uri)) {
-            Log.e(tag, "+++ Document URI");
+            Log.d(tag, "+++ Document URI");
             // ExternalStorageProvider
             if (isExternalStorageDocument(uri)) {
                 Log.e(tag, "+++ External Document URI");
@@ -377,5 +377,7 @@ public class FileUtils {
         }
         return null;
     }
+
+
 
 }
